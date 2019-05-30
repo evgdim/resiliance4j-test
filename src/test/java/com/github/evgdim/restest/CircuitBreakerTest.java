@@ -73,4 +73,42 @@ public class CircuitBreakerTest
         assertThatThrownBy(() -> getPerson.apply(2L)).isInstanceOf(CallNotPermittedException.class);
         assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.OPEN);
     }
+
+    @Test
+    public void shouldOpen_whenServiceFail4Times_usingSupplier() {
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .recordExceptions(RuntimeException.class)
+                .ringBufferSizeInClosedState(4)
+
+                .build();
+        CircuitBreaker circuitBreaker = CircuitBreaker.of("personService",config);
+
+        PersonService personServiceMock = mock(PersonService.class);
+        when(personServiceMock.getById(anyLong()))
+                .thenThrow(new RuntimeException("test"))
+                .thenThrow(new RuntimeException("test"))
+                .thenThrow(new RuntimeException("test"))
+                .thenThrow(new RuntimeException("test"))
+                .thenReturn(new Person("1"));
+
+        Supplier< Person> getPerson1 = CircuitBreaker.decorateSupplier(circuitBreaker, () -> personServiceMock.getById(2L));
+        assertThatThrownBy(() -> getPerson1.get()).isInstanceOf(RuntimeException.class).hasMessage("test");
+        assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+
+        Supplier< Person> getPerson2 = CircuitBreaker.decorateSupplier(circuitBreaker, () -> personServiceMock.getById(2L));
+        assertThatThrownBy(() -> getPerson2.get()).isInstanceOf(RuntimeException.class).hasMessage("test");
+        assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+
+        Supplier< Person> getPerson3 = CircuitBreaker.decorateSupplier(circuitBreaker, () -> personServiceMock.getById(2L));
+        assertThatThrownBy(() -> getPerson3.get()).isInstanceOf(RuntimeException.class).hasMessage("test");
+        assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.CLOSED);
+
+        Supplier< Person> getPerson4 = CircuitBreaker.decorateSupplier(circuitBreaker, () -> personServiceMock.getById(2L));
+        assertThatThrownBy(() -> getPerson4.get()).isInstanceOf(RuntimeException.class).hasMessage("test");
+        assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.OPEN);
+
+        Supplier< Person> getPerson5 = CircuitBreaker.decorateSupplier(circuitBreaker, () -> personServiceMock.getById(2L));
+        assertThatThrownBy(() -> getPerson5.get()).isInstanceOf(CallNotPermittedException.class);
+        assertThat(circuitBreaker.getState()).isEqualTo(CircuitBreaker.State.OPEN);
+    }
 }
